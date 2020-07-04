@@ -30,15 +30,24 @@ Yp(Yp>n0) = 2*n0-Yp(Yp>n0);
 
 Y = J(Xp+(Yp-1)*n0);
 Y = reshape(Y, [n, m]);
+%-----------------------------------------------------------------
 
+%centering and normalizing the data--------------------------
 mean(Y);
 mean_matrix = repmat(ans,64,1);
 Y = Y - mean_matrix ;
+
+norm_of_each_column = [];
+for b = 1 : size(Y,2)
+    norm_of_each_column = [ norm_of_each_column norm(Y(:,b)) ];
+    Y(:,b) = Y(:,b)/norm_of_each_column(b);
+end        
 %------------------------------------------------------------------
 
 
-%we initialize the Dictionary with the overcomplete DCT transform    
+%we initialize the Dictionary with the overcomplete DCT transform
 D = dctmtx(256);
+D = D';
 D(65:256,:) = [];
 
 X = ones(size(D,2),size(Y,2));
@@ -46,10 +55,15 @@ X = ones(size(D,2),size(Y,2));
 
 %Dictionary learning algorithm-------------------------------
 for i = 1 : 10
+
+    %normalizing all the atoms of the dictionary in order for the OMP to work properly
+    for i = 1 : size(D,2)
+        D(:,i) = D(:,i)./norm(D(:,i));
+    end 
     
     %sparse coding 
     for k = 1 : size(Y,2)
-        [X(:,k),supp,iter] = omp(Y(:,k),D,6,1);
+        X(:,k) = omp(Y(:,k),D,6,1e-5);
     end 
     
     %dictionary update 
@@ -59,14 +73,19 @@ end
 
 
     for k = 1 : size(Y,2)
-        [X(:,k),supp,iter] = omp(Y(:,k),D,6,1);
+        X(:,k) = omp(Y(:,k),D,6,1e-5);
     end
  
 %----------------------------------------------------------
 
 %reconstructing the image by averaging all the overlapped and denoised
 %patches to obtain the corresponding pixels-----------------------------
-Y1 = reshape(D*X + mean_matrix , [w w m]);
+temp = D*X ; 
+for i = 1 : size(temp,2)
+    temp(:,i) = temp(:,i).*norm_of_each_column(i);
+end    
+    
+Y1 = reshape(temp + mean_matrix , [w w m]);
 
 
 W = zeros(n0,n0);
@@ -86,7 +105,7 @@ PSNR = 20*log10(max(f(:))) - 10*log10(MSE)
 
 
 figure,imshow((f1));
-title('Denoised Image \n');
+title('Denoised Image');
 figure,imshow(J);
 title('Noisy Image');
         
