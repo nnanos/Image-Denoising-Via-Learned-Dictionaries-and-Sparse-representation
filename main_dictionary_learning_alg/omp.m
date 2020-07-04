@@ -1,32 +1,36 @@
-function [sparse_x, support, iteration] = omp(y, A, K, S, err)
+function sparse_x = omp(y, D, K, err)
+
+residual = y ;
+support = [] ;
+
+sparse_x = zeros( size(D,2) , 1 );
+
+tmp = D';
 
 
- 	if nargin < 5
-	   err    = 1e-5;
-    end 
-    
-	sparse_x	  = zeros(size(A,2), 1);
-	residual  = y;
-	supp	  = [];
-	iteration = 0; 
+iteration = 1;
+while ( norm(residual) > err ) && ( iteration <= K )
+	iteration = iteration + 1;
 	
-	while (norm(residual) > err && iteration < min(K, floor(size(A,1)/S))) 
-		   iteration          = iteration + 1;
-		   [~, idx]           = sort(abs(A' * residual), 'descend');
-		   supp_temp          = union(supp, idx(1:S));
-
-	   if (length(supp_temp) ~= length(supp))
-           supp	              = supp_temp;
-		   x_hat			  = A(:,supp)\y;
-		   residual           = y - A(:,supp) * x_hat; 
-       else
-		   break;
-       end
-    end
-    
- 	sparse_x(supp)	          = A(:,supp)\y;
-	[~, supp_idx]             = sort(abs(sparse_x), 'descend');
-	support                   = supp_idx(1:K); 
-	sparse_x                    = zeros(size(A,2), 1);
-    sparse_x(support)           = A(:,support)\y;
-end
+	
+	%idx is the index of the collumn (of D) that has the max inner product with the residual
+	[~, idx] = max(abs(tmp * residual));
+	
+	selected_atom = tmp(idx,:);
+	
+	k = tmp(idx,:)*residual;
+	
+	sparse_x(idx) = k;
+	
+	support = [ support idx ];
+	
+	%orthogonal matcing persuit step
+	%projecting the signal to the subspace spanned by the atoms that are in the support set
+	Dsup = D(:,support);
+	%residual = (eye(size(D,1)) - Dsup*inv(Dsup'*Dsup)*Dsup')*y;
+    updated_coefs = Dsup\y;
+    residual = y - ( Dsup * updated_coefs );
+	
+end	
+	
+end	
